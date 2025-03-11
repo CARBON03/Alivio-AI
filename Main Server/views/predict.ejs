@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alivio</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        #chat {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        
+        .user-message {
+            background-color: #e1f5fe;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .ai-message {
+            background-color: #f1f1f1;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .status {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            margin: 10px 0;
+        }
+        
+        .listening-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #e74c3c;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(0.8); opacity: 0.7; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.8); opacity: 0.7; }
+        }
+        
+        .text-input {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #status {
+            height: 20px;
+        }
+        
+        /* Symptom Selection Styles */
+        .symptom-selection {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+        
+        .search-container {
+            position: relative;
+            margin-bottom: 10px;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7f8c8d;
+        }
+        
+        #symptomSearch {
+            width: 100%;
+            padding: 10px 10px 10px 35px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        
+        .dropdown-container {
+            position: relative;
+            width: 100%;
+        }
+        
+        .symptom-dropdown {
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: none;
+            position: absolute;
+            z-index: 10;
+        }
+        
+        .symptom-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .symptom-option:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .symptom-option.selected {
+            background-color: #e1f5fe;
+        }
+        
+        .symptom-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+            min-height: 40px;
+            padding: 8px;
+            border: 1px dashed #ddd;
+            border-radius: 4px;
+        }
+        
+        .symptom-tag {
+            background-color: #e1f5fe;
+            padding: 5px 10px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+        }
+        
+        .remove-tag {
+            margin-left: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+        
+        .remove-tag:hover {
+            color: #e74c3c;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .no-results {
+            padding: 10px 15px;
+            color: #7f8c8d;
+            font-style: italic;
+            text-align: center;
+        }
+
+        /* Added styles for direct text input */
+        .input-methods {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .input-method {
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+            font-weight: 500;
+        }
+
+        .input-method.active {
+            background-color: #e1f5fe;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .input-container {
+            margin-top: 15px;
+        }
+
+        #directTextInput {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .permission-request {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .permission-actions {
+            margin-top: 10px;
+        }
+
+        .mic-status {
+            display: flex;
+            align-items: center;
+            margin-left: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Support for speech confidence */
+        .transcript-container {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .interim-transcript {
+            color: #777;
+            font-style: italic;
+        }
+
+        .final-transcript {
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Alivio AI Doctor</h2>
+        
+        <div id="status"></div>
+        
+        <div id="chat"></div>
+<!--         
+        <div class="controls">
+            <button id="voiceButton" onclick="toggleListening()">
+                🎤 Speak Symptoms
+            </button>
+            <div id="micStatus" class="mic-status"></div>
+        </div> -->
+
+        <div id="permissionRequest" class="permission-request">
+            <p>Microphone access is needed for speech recognition. Please allow access when prompted.</p>
+            <div class="permission-actions">
+                <button onclick="requestMicrophonePermission()">Allow Microphone</button>
+            </div>
+        </div>
+        
+        <div id="transcriptContainer" class="transcript-container">
+            <div id="interimTranscript" class="interim-transcript"></div>
+            <div id="finalTranscript" class="final-transcript"></div>
+        </div>
+        
+        <div class="text-input">
+            <div class="input-methods">
+                <div class="input-method active" onclick="switchInputMethod('dropdown')">Select Symptoms</div>
+                <div class="input-method" onclick="switchInputMethod('text')">Enter Symptoms</div>
+                <div class="input-method" onclick="switchInputMethod('speech')">Speak Symptoms</div>
+            </div>
+            
+            
+            <div id="dropdownMethod" class="input-container">
+                <div class="symptom-tags" id="selectedSymptoms"></div>
+                
+                <div class="symptom-selection">
+                    <div class="search-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="symptomSearch" placeholder="Search for symptoms..." autocomplete="off" oninput="filterSymptoms()" onfocus="showDropdown()">
+                    </div>
+                    
+                    <div class="dropdown-container">
+                        <div id="symptomDropdown" class="symptom-dropdown"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="textMethod" class="input-container" style="display: none;">
+                <textarea id="directTextInput" placeholder="Describe your symptoms in detail..."></textarea>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="sendButton" onclick="sendSymptoms()">Send Symptoms</button>
+                <button id="clearButton" onclick="clearSymptoms()">Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Symptom database (134 symptoms)
+        const symptomsList = [
+            "itching","skin rash","nodal skin eruptions","continuous sneezing","shivering",
+"chills","joint pain","stomach pain","acidity","ulcers on tongue","muscle wasting",
+"vomiting","burning micturition","spotting urination","fatigue","weight gain",
+"anxiety","cold hands and feets","mood swings","weight loss","restlessness",
+"lethargy","patches in throat","irregular sugar level","cough","high fever",
+"sunken eyes","breathlessness","sweating","dehydration","indigestion","headache",
+"yellowish skin","dark urine","nausea","loss of appetite","pain behind the eyes",
+"back pain","constipation","abdominal pain","diarrhoea","mild fever","yellow urine",
+"yellowing of eyes","acute liver failure","fluid overload","swelling of stomach",
+"swelled lymph nodes","malaise","blurred and distorted vision","phlegm",
+"throat irritation","redness of eyes","sinus pressure","runny nose","congestion",
+"chest pain","weakness in limbs","fast heart rate","pain during bowel movements",
+"pain in anal region","bloody stool","irritation in anus","neck pain","dizziness",
+"cramps","bruising","obesity","swollen legs","swollen blood vessels",
+"puffy face and eyes","enlarged thyroid","brittle nails","swollen extremeties",
+"excessive hunger","extra marital contacts","drying and tingling lips",
+"slurred speech","knee pain","hip joint pain","muscle weakness","stiff neck",
+"swelling joints","movement stiffness","spinning movements","loss of balance",
+"unsteadiness","weakness of one body side","loss of smell","bladder discomfort",
+"foul smell of urine","continuous feel of urine","passage of gases",
+"internal itching","toxic look (typhos)","depression","irritability",
+"muscle pain","altered sensorium","red spots over body","belly pain",
+"abnormal menstruation","dischromic patches","watering from eyes",
+"increased appetite","polyuria","family history","mucoid sputum","rusty sputum",
+"lack of concentration","visual disturbances","receiving blood transfusion",
+"receiving unsterile injections","coma","stomach bleeding","distention of abdomen",
+"history of alcohol consumption","fluid overload","blood in sputum",
+"prominent veins on calf","palpitations","painful walking","pus filled pimples",
+"blackheads","scurring","skin peeling","silver like dusting","small dents in nails",
+"inflammatory nails","blister","red sore around nose","yellow crust ooze","prognosis"
+        ];
+        
+        // Determine the server URL dynamically
+        const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? `http://${window.location.hostname}:3000`
+            : window.location.origin;
+        
+        let hasBeenGreeted = false; // Track if greeting has been displayed
+        let selectedSymptoms = []; // Track currently selected symptoms
+        let activeInputMethod = 'dropdown'; // Track current input method
+        let permissionDenied = false; // Track if microphone permission was denied
+            
+        // Connect to the server with improved options
+        const socket = io(serverUrl, { 
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+            timeout: 20000,
+            transports: ['websocket', 'polling']
+        });
+        
+        let isListening = false;
+        let recognition = null;
+        let speechSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+        
+        // Display welcome greeting on page load regardless of socket connection
+        window.onload = () => {
+            displayGreeting();
+            populateSymptomDropdown();
+            
+            if (!speechSupported) {
+                document.getElementById('permissionRequest').style.display = 'none';
+                addMessage("Speech recognition is not supported in your browser. Please use the symptom selection instead.", "error");
+            } else {
+                // Check speech recognition permissions
+                checkMicrophonePermission();
+                
+                // Set up event listener for direct text input
+                document.getElementById("directTextInput").addEventListener("keydown", function(event) {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        sendSymptoms();
+                    }
+                });
+            }
+            
+            // Handle clicking outside dropdown to close it
+            document.addEventListener('click', function(event) {
+                const dropdown = document.getElementById("symptomDropdown");
+                const searchInput = document.getElementById("symptomSearch");
+                
+                if (event.target !== dropdown && event.target !== searchInput && !dropdown.contains(event.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+            
+            // Handle search input keydown for navigation
+            document.getElementById("symptomSearch").addEventListener("keydown", function(event) {
+                const dropdown = document.getElementById("symptomDropdown");
+                const options = dropdown.querySelectorAll(".symptom-option");
+                
+                if (dropdown.style.display === 'none') return;
+                
+                let currentIndex = -1;
+                for (let i = 0; i < options.length; i++) {
+                    if (options[i].classList.contains('selected')) {
+                        currentIndex = i;
+                        break;
+                    }
+                }
+                
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    if (currentIndex < options.length - 1) {
+                        if (currentIndex >= 0) options[currentIndex].classList.remove('selected');
+                        options[currentIndex + 1].classList.add('selected');
+                        options[currentIndex + 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (currentIndex > 0) {
+                        options[currentIndex].classList.remove('selected');
+                        options[currentIndex - 1].classList.add('selected');
+                        options[currentIndex - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (currentIndex >= 0) {
+                        selectSymptom(options[currentIndex].textContent);
+                    }
+                } else if (event.key === 'Escape') {
+                    dropdown.style.display = 'none';
+                }
+            });
+        };
+    
+        // Function to check microphone permission
+        function checkMicrophonePermission() {
+            if (!speechSupported) return;
+            
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    // Permission granted
+                    stream.getTracks().forEach(track => track.stop());
+                    document.getElementById('permissionRequest').style.display = 'none';
+                    permissionDenied = false;
+                })
+                .catch(err => {
+                    console.log("Microphone permission error:", err);
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        document.getElementById('permissionRequest').style.display = 'block';
+                        permissionDenied = true;
+                    }
+                });
+        }
+    
+        // Function to request microphone permission
+        function requestMicrophonePermission() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    stream.getTracks().forEach(track => track.stop());
+                    document.getElementById('permissionRequest').style.display = 'none';
+                    permissionDenied = false;
+                    addMessage("Microphone access granted. You can now use voice input.", "ai");
+                })
+                .catch(err => {
+                    console.error("Microphone permission denied:", err);
+                    addMessage("Microphone access was denied. You'll need to allow microphone access in your browser settings to use voice input.", "error");
+                });
+        }
+        
+        // Switch between input methods
+        function switchInputMethod(method) {
+            activeInputMethod = method;
+            
+            // Update active tab
+            const tabs = document.querySelectorAll('.input-method');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            if (method === 'dropdown') {
+                document.getElementById('dropdownMethod').style.display = 'block';
+                document.getElementById('textMethod').style.display = 'none';
+                document.querySelector('.input-method:nth-child(1)').classList.add('active');
+                
+                // Stop speech recognition if it was active
+                if (isListening) {
+                    toggleListening();
+                }
+            } else {
+                document.getElementById('dropdownMethod').style.display = 'none';
+                document.getElementById('textMethod').style.display = 'block';
+                document.querySelector('.input-method:nth-child(2)').classList.add('active');
+            }
+            
+            // Update send button state
+            updateSendButtonState();
+        }
+        
+        // Show the dropdown when search input is focused
+        function showDropdown() {
+            const dropdown = document.getElementById("symptomDropdown");
+            dropdown.style.display = 'block';
+            filterSymptoms();
+        }
+        
+        // Filter symptoms based on search input
+        function filterSymptoms() {
+            const searchInput = document.getElementById("symptomSearch");
+            const dropdown = document.getElementById("symptomDropdown");
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            dropdown.innerHTML = '';
+            dropdown.style.display = 'block';
+            
+            const filteredSymptoms = symptomsList.filter(symptom => 
+                symptom.toLowerCase().includes(searchTerm)
+            );
+            
+            if (filteredSymptoms.length === 0) {
+                const noResults = document.createElement("div");
+                noResults.className = "no-results";
+                noResults.textContent = "No symptoms found";
+                dropdown.appendChild(noResults);
+                return;
+            }
+            
+            filteredSymptoms.forEach(symptom => {
+                const option = document.createElement("div");
+                option.className = "symptom-option";
+                option.textContent = symptom;
+                option.onclick = function() {
+                    selectSymptom(symptom);
+                };
+                dropdown.appendChild(option);
+            });
+        }
+        
+        // Select a symptom from the dropdown
+        function selectSymptom(symptom) {
+            if (!selectedSymptoms.includes(symptom)) {
+                selectedSymptoms.push(symptom);
+                updateSelectedSymptomsDisplay();
+                
+                // Clear search input and hide dropdown
+                const searchInput = document.getElementById("symptomSearch");
+                searchInput.value = "";
+                document.getElementById("symptomDropdown").style.display = 'none';
+            }
+        }
+        
+        // Populate symptom dropdown
+        function populateSymptomDropdown() {
+            const dropdown = document.getElementById("symptomDropdown");
+            
+            // Sort symptoms alphabetically
+            symptomsList.sort().forEach(symptom => {
+                const option = document.createElement("div");
+                option.className = "symptom-option";
+                option.textContent = symptom;
+                option.onclick = function() {
+                    selectSymptom(symptom);
+                };
+                dropdown.appendChild(option);
+            });
+        }
+        
+        // Remove a symptom from the selected list
+        function removeSymptom(symptom) {
+            selectedSymptoms = selectedSymptoms.filter(s => s !== symptom);
+            updateSelectedSymptomsDisplay();
+        }
+        
+        // Update the display of selected symptoms
+        function updateSelectedSymptomsDisplay() {
+            const container = document.getElementById("selectedSymptoms");
+            container.innerHTML = '';
+            
+            selectedSymptoms.forEach(symptom => {
+                const tag = document.createElement("div");
+                tag.className = "symptom-tag";
+                tag.innerHTML = `${symptom} <span class="remove-tag" onclick="removeSymptom('${symptom}')">×</span>`;
+                container.appendChild(tag);
+            });
+            
+            // Update the send button state
+            updateSendButtonState();
+        }
+        
+        // Update send button state based on active input method
+        function updateSendButtonState() {
+            const sendButton = document.getElementById("sendButton");
+            
+            if (activeInputMethod === 'dropdown') {
+                sendButton.disabled = selectedSymptoms.length === 0;
+            } else {
+                const textInput = document.getElementById("directTextInput").value.trim();
+                sendButton.disabled = textInput === '' && !isListening;
+            }
+        }
+        
+        // Listen for input in direct text input to update send button state
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById("directTextInput").addEventListener('input', updateSendButtonState);
+        });
+        
+        // Clear all selected symptoms or text input
+        function clearSymptoms() {
+            if (activeInputMethod === 'dropdown') {
+                selectedSymptoms = [];
+                updateSelectedSymptomsDisplay();
+            } else {
+                document.getElementById("directTextInput").value = '';
+                updateSendButtonState();
+            }
+        }
+        
+        // Display greeting
+        function displayGreeting() {
+            // Clear chat history first
+            const chatDiv = document.getElementById("chat");
+            chatDiv.innerHTML = '';
+            
+            // Add greeting message that's always shown on page load
+            const greetingMessages = [
+                "Hello! I'm your AI doctor assistant. How can I help you today?",
+                "Welcome to Alivio! Please select your symptoms so I can assist you.",
+                "Hi there! I'm here to help with your health concerns. What symptoms are you experiencing?",
+                "Good day! I'm your AI health assistant. Please describe how you're feeling."
+            ];
+            
+            // Pick a random greeting
+            const randomGreeting = greetingMessages[Math.floor(Math.random() * greetingMessages.length)];
+            addMessage(randomGreeting, "ai");
+            hasBeenGreeted = true;
+        }
+        
+        // Initialize speech recognition with improved functionality
+        function initSpeechRecognition() {
+            if (!speechSupported) {
+                addMessage("Speech recognition is not supported in your browser. Please use the symptom selection instead.", "error");
+                return null;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = "en-US";
+            recognition.continuous = true;  // Changed to true for continuous listening
+            recognition.interimResults = true;  // Show interim results
+            
+            recognition.onstart = () => {
+                document.getElementById("transcriptContainer").style.display = "block";
+                document.getElementById("interimTranscript").textContent = "Listening...";
+                document.getElementById("finalTranscript").textContent = "";
+                document.getElementById("micStatus").innerHTML = '<span style="color: green">●</span> Listening';
+            };
+            
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                document.getElementById("interimTranscript").textContent = interimTranscript;
+                
+                if (finalTranscript) {
+                    document.getElementById("finalTranscript").textContent = finalTranscript;
+                    
+                    // If we're using direct text input, append the transcript
+                    if (activeInputMethod === 'text') {
+                        const textArea = document.getElementById("directTextInput");
+                        textArea.value += (textArea.value ? ' ' : '') + finalTranscript;
+                        updateSendButtonState();
+                    }
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error", event.error);
+                let errorMsg = "Speech recognition error. ";
+                
+                switch (event.error) {
+                    case 'no-speech':
+                        errorMsg += "I couldn't hear anything. Please try again.";
+                        break;
+                    case 'network':
+                        errorMsg += "Network error. Check your internet connection.";
+                        break;
+                    case 'aborted':
+                        errorMsg += "Recognition was aborted.";
+                        break;
+                    case 'not-allowed':
+                        errorMsg += "Microphone access denied. Please check your browser permissions.";
+                        permissionDenied = true;
+                        document.getElementById('permissionRequest').style.display = 'block';
+                        break;
+                    case 'service-not-allowed':
+                        errorMsg += "Speech recognition service not allowed.";
+                        break;
+                    default:
+                        errorMsg += event.error;
+                }
+                
+                if (event.error !== 'no-speech') {
+                    addMessage(errorMsg, "error");
+                }
+                
+                isListening = false;
+                updateListeningUI();
+                document.getElementById("transcriptContainer").style.display = "none";
+                document.getElementById("micStatus").textContent = '';
+            };
+            
+            recognition.onend = () => {
+                // Only show this if actually stopped listening
+                if (isListening) {
+                    // If the recognition ended but we're still supposed to be listening, restart it
+                    try {
+                        setTimeout(() => recognition.start(), 100);
+                    } catch (e) {
+                        console.error("Could not restart recognition:", e);
+                        isListening = false;
+                        updateListeningUI();
+                        document.getElementById("transcriptContainer").style.display = "none";
+                        document.getElementById("micStatus").textContent = '';
+                    }
+                } else {
+                    document.getElementById("transcriptContainer").style.display = "none";
+                    document.getElementById("micStatus").textContent = '';
+                }
+            };
+            
+            return recognition;
+        }
+        
+        
+        function toggleListening() {
+            if (!speechSupported) return;
+            
+            if (!recognition) {
+                recognition = initSpeechRecognition();
+                if (!recognition) return;
+            }
+            
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+            } else {
+                try {
+                    recognition.abort(); // Make sure any previous instance is fully stopped
+                    setTimeout(() => {
+                        try {
+                            recognition.start();
+                            isListening = true;
+                            setStatus("Listening...");
+                        } catch (error) {
+                            console.error("Recognition start error:", error);
+                            recognition = initSpeechRecognition();
+                            setTimeout(() => {
+                                try {
+                                    recognition.start();
+                                    isListening = true;
+                                    setStatus("Listening...");
+                                } catch (retryError) {
+                                    console.error("Recognition retry error:", retryError);
+                                    addMessage("Could not start speech recognition. Please try again later or use symptom selection.", "error");
+                                }
+                            }, 500);
+                        }
+                    }, 200);
+                } catch (error) {
+                    console.error("Recognition error:", error);
+                    // Sometimes we need to create a new instance if there was an error
+                    recognition = initSpeechRecognition();
+                    try {
+                        recognition.start();
+                        isListening = true;
+                        setStatus("Listening...");
+                    } catch (retryError) {
+                        console.error("Recognition retry error:", retryError);
+                        addMessage("Could not start speech recognition. Please try again later or use symptom selection.", "error");
+                    }
+                }
+            }
+            
+            updateListeningUI();
+            updateSendButtonState();
+        }
+        
+        function updateListeningUI() {
+            const speakToggle = document.getElementById('speakToggle');
+            if (speakToggle) {
+                if (isListening) {
+                    speakToggle.innerHTML = '<span style="color: green">●</span> Stop Listening';
+                } else {
+                    speakToggle.innerHTML = '🎤 Start Speaking';
+                }
+            }
+        }
+        
+        function sendSymptoms() {
+            let symptomsToSend = "";
+            
+            if (activeInputMethod === 'dropdown') {
+                if (selectedSymptoms.length > 0) {
+                    symptomsToSend = selectedSymptoms.join(", ");
+                    // Clear selected symptoms after sending
+                    selectedSymptoms = [];
+                    updateSelectedSymptomsDisplay();
+                } else {
+                    return; // Don't send if no symptoms selected
+                }
+            } else { // text input method
+                const textInput = document.getElementById("directTextInput").value.trim();
+                if (textInput) {
+                    symptomsToSend = textInput;
+                    // Clear the text input after sending
+                    document.getElementById("directTextInput").value = "";
+                    updateSendButtonState();
+                } else {
+                    return; // Don't send if text is empty
+                }
+            }
+            
+            // Only proceed if we have symptoms to send
+            if (symptomsToSend) {
+                addMessage("You: " + symptomsToSend, "user");
+                socket.emit("send_symptoms", { symptoms: symptomsToSend });
+            }
+        }
+        
+        // Add message to chat
+        function addMessage(text, type) {
+            const chatDiv = document.getElementById("chat");
+            const message = document.createElement("div");
+            message.textContent = text;
+            message.className = "message";
+            
+            switch(type) {
+                case "user":
+                    message.classList.add("user-message");
+                    break;
+                case "ai":
+                    message.classList.add("ai-message");
+                    speakText(text);
+                    break;
+                case "error":
+                    message.classList.add("error-message");
+                    break;
+            }
+            
+            chatDiv.appendChild(message);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+        }
+        
+        function setStatus(text) {
+            const statusDiv = document.getElementById("status");
+            statusDiv.textContent = text;
+        }
+        
+        // Text-to-speech function
+        function speakText(text) {
+            // Only speak AI responses, not user messages
+            if (!text.startsWith("You:")) {
+                const speech = new SpeechSynthesisUtterance(text);
+                speech.lang = "en-US";
+                speech.rate = 1.0;
+                speech.pitch = 1.0;
+                speechSynthesis.speak(speech);
+            }
+        }
+        
+        // Socket event handlers
+        socket.on("connect", () => {
+            console.log("Connected to server");
+            // We don't add another greeting here since we already display one on page load
+        });
+        
+        socket.on("connect_error", (error) => {
+            console.error("Connection error:", error);
+            addMessage("Connection error. Please check if the server is running and refresh the page.", "error");
+        });
+        
+        socket.on("receive_message", (data) => {
+            // Skip the initial server greeting if we've already displayed one
+            if (data.reply && data.reply.includes("Hello! I am your AI doctor") && hasBeenGreeted) {
+                return;
+            }
+            
+            if (data.reply) {
+                addMessage(data.reply, "ai");
+            } else if (data.error) {
+                addMessage(data.error, "error");
+            }
+        });
+        
+        socket.on("processing", (data) => {
+            if (data.status) {
+                setStatus("Processing your symptoms...");
+            } else {
+                setStatus("");
+            }
+        });
+    </script>
+</body>
+</html>
+
+
